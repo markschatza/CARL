@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <deque>
@@ -10,6 +11,7 @@
 
 #include "RLEnvironment.cuh"
 #include "EnvIO.cuh"
+#include "State/Replay.cuh"
 #include "Physics/BoostPads.cuh"
 
 namespace py = pybind11;
@@ -665,6 +667,41 @@ public:
         }
     }
 
+    template<bool restore>
+    void replay1v1(py::object indices, py::object buffer)
+    {
+        if (!env.is1v1()) throw py::value_error("replay snapshots require 1v1");
+        int count = 0;
+        auto ids = selectionData(indices, count);
+        auto rows = tensorData(buffer, "replay snapshot", {count, REPLAY_WORDS}, kDLInt, 32);
+        if (!count) return;
+        // Snapshot rows are opaque native state. Keep both buffers alive and
+        // reject ambiguous writes when several rows target the same simulation.
+        const auto* selected = static_cast<const int64_t*>(data(ids.tensor));
+        std::vector<int64_t> lanes(count);
+        CUDA_CHECK(cudaMemcpyAsync(lanes.data(), selected, count * sizeof(int64_t),
+                                   CARL_DToH, env.getStream()));
+        CUDA_CHECK(cudaStreamSynchronize(env.getStream()));
+        std::sort(lanes.begin(), lanes.end());
+        if (lanes.front() < 0 || lanes.back() >= env.getNSim()
+            || std::adjacent_find(lanes.begin(), lanes.end()) != lanes.end())
+            throw py::value_error("replay lanes must be unique and in range");
+        auto* bytes = static_cast<const char*>(data(rows.tensor));
+        if (reinterpret_cast<uintptr_t>(bytes) % alignof(ReplayLane))
+            throw py::value_error("unaligned replay snapshot");
+        transferReplay<restore><<<(count + 31) / 32, 32, 0, env.getStream()>>>(
+            env.getDeviceState(), env.getDeviceWorkspace(),
+            static_cast<const int64_t*>(data(ids.tensor)),
+            reinterpret_cast<ReplayLane*>(const_cast<char*>(bytes)), count);
+        CUDA_CHECK(cudaGetLastError());
+        if constexpr (restore) {
+            io.packObs(env.getDeviceState());
+            io.packState(env.getDeviceState());
+            io.packRawMatchState(env.getDeviceState());
+        }
+        CUDA_CHECK(cudaStreamSynchronize(env.getStream()));
+    }
+
     void setMatchState(py::object blueScore, py::object orangeScore,
                        py::object episodeTicks, py::object simulationIndices)
     {
@@ -885,6 +922,8 @@ PYBIND11_MODULE(_carl, m)
     m.attr("OBS_EGO_CONTROLLER") = OBS_EGO_CONTROLLER;
     m.attr("OBS_PREVIOUS_CONTROLS") = OBS_PREVIOUS_CONTROLS;
     m.attr("OBS_CONTROLLER_VERSION") = OBS_CONTROLLER_VERSION;
+    m.attr("REPLAY_1V1_VERSION") = 1;
+    m.attr("REPLAY_1V1_WORDS") = REPLAY_WORDS;
     m.attr("CAR_INTERNAL_SIZE") = static_cast<int>(CAR_INTERNAL_SIZE);
     m.attr("OBS_EGO_DODGE_TIME_INDEX") = OBS_EGO_DODGE_TIME_INDEX;
 
@@ -953,6 +992,8 @@ PYBIND11_MODULE(_carl, m)
              py::arg("internal_state") = py::none(),
              py::arg("simulation_indices") = py::none())
 
+        .def("capture_replay_1v1", &EnvWrapper::replay1v1<false>)
+        .def("restore_replay_1v1", &EnvWrapper::replay1v1<true>)
         .def("get_obs",              &EnvWrapper::getObs)
         .def("get_transition_obs",   &EnvWrapper::getTransitionObs)
         .def("get_state",            &EnvWrapper::getState)

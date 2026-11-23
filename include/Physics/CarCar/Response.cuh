@@ -139,9 +139,7 @@ CARL_D CARL_FI void applyDemo(
     state->cars.carContactCooldown[demo.bumper] = BUMP_COOLDOWN_TIME;
 
     CarInternalState& victim = state->cars.internal[demo.victim];
-    const uint32_t seed = (uint32_t)state->seed
-        ^ (uint32_t)demo.victim * 0x9e3779b9u
-        ^ (uint32_t)state->tickCount;
+    const uint32_t seed = state->demoSeed(demo.victim);
     victim.respawnIdx = randomIndex(seed, 4);
     victim.lastRespawnDir = 0;
 }

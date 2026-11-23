@@ -75,3 +75,17 @@ export CARL_ARENA_METADATA="$PWD/arena_metadata.txt"
 
 Without this file, CARL uses its default arena setup. Normal builds do not need
 RocketSim or RLGym.
+
+### Decision-frame restarts for 1v1
+
+The native environment can capture selected lanes between decisions with
+`capture_replay_1v1(indices, rows)` and restore them with
+`restore_replay_1v1(indices, rows)`. Pass unique contiguous GPU int64 lane
+indices and a contiguous, aligned GPU int32 tensor with shape
+`[len(indices), REPLAY_1V1_WORDS]`. Zero-initialize capture buffers. Treat
+rows as opaque, trusted simulator output and persist `REPLAY_1V1_VERSION`
+alongside them. Use the same simulator revision or a compatible layout when
+restoring. Both methods complete on the native stream before returning.
+Restoring refreshes current observations and preserves the terminal transition
+buffers. The recorded teams, controller state, contact caches, pad clocks and
+decision-time physics continue in the destination lane.

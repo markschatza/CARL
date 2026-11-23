@@ -179,6 +179,11 @@ struct CarState
     }
 };
 
+struct ReplayOrigin
+{
+    int tickOffset, seed, lanePlusOne;
+};
+
 struct GameState
 {
     const int nSim;
@@ -189,6 +194,22 @@ struct GameState
     const int seed;
 
     int tickCount;
+    DeviceArray<ReplayOrigin> replayOrigin;
+
+    CARL_D CARL_FI int laneTick(int lane) const
+    {
+        return tickCount + replayOrigin[lane].tickOffset;
+    }
+
+    CARL_D CARL_FI uint32_t demoSeed(int car) const
+    {
+        const int lane = car / nCars;
+        const auto origin = replayOrigin[lane];
+        const int sourceCar = origin.lanePlusOne
+            ? (origin.lanePlusOne - 1) * nCars + car % nCars : car;
+        return (uint32_t)(origin.lanePlusOne ? origin.seed : seed)
+            ^ (uint32_t)sourceCar * 0x9e3779b9u ^ (uint32_t)laneTick(lane);
+    }
     DeviceArray<int> episodeTicks;
     DeviceArray<int> lastBallTouchTicks;
 
@@ -209,6 +230,7 @@ struct GameState
         , nTotalCars(nSim * nCars)
         , seed(seed)
         , tickCount(0)
+        , replayOrigin(nSim)
         , episodeTicks(nSim)
         , lastBallTouchTicks(nSim)
         , ball(nSim)
@@ -221,6 +243,7 @@ struct GameState
     void reset()
     {
         tickCount = 0;
+        replayOrigin.fill(0);
         episodeTicks.fill(0);
         lastBallTouchTicks.fill(0);
         ball.reset();

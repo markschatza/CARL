@@ -346,7 +346,7 @@ CARL_D CARL_FI void packState(
         const int carIdx = carBase + c;
         packObservedCar(state, carIdx, false, output, o);
         output[o++] = state->cars.ballContactTick[carIdx]
-                    > state->tickCount - touchWindow;
+                    > state->laneTick(simIdx) - touchWindow;
     }
 
     for (int p = 0; p < NUM_BOOST_PADS; p++)
@@ -384,7 +384,7 @@ CARL_D CARL_FI void packDones(
     const bool scored = goal.lastScorer != 0;
     const bool gameOver = !goal.overtime && regulationExpired;
     const bool timeout = (noTouchTimeoutTicks > 0
-        && state->tickCount - state->lastBallTouchTicks[simIdx]
+        && state->laneTick(simIdx) - state->lastBallTouchTicks[simIdx]
         >= noTouchTimeoutTicks);
 
     dones[simIdx] = gameOver || overtimeExpired || timeout || scored;

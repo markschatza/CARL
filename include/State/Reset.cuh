@@ -54,6 +54,8 @@ CARL_D CARL_FI void resetToKickoff(GameState* __restrict__ state, int simIdx)
     const int nOrange = state->nOrange;
     const int nCars = state->nCars;
 
+    state->replayOrigin[simIdx] = {};
+
     // Both teams use corresponding entries from one shuffled location order
     const uint32_t seed = hash32((uint32_t)state->seed)
                         ^ hash32((uint32_t)simIdx)
@@ -90,7 +92,7 @@ CARL_D CARL_FI void resetAfterDone(
     GoalState& goal = state->goals[simIdx];
     const bool scored = goal.lastScorer != 0;
 
-    const int ticksSinceTouch = state->tickCount - state->lastBallTouchTicks[simIdx];
+    const int ticksSinceTouch = state->laneTick(simIdx) - state->lastBallTouchTicks[simIdx];
 
     const bool noTouchTimeout = noTouchTimeoutTicks > 0
         && ticksSinceTouch >= noTouchTimeoutTicks;

@@ -294,7 +294,7 @@ CARL_D CARL_FI void solveCarArena(
     SolverBody body = loadSolverBody(state, carIdx);
     const CarPose pose = { body.cen, body.rot };
 
-    applyCarSuspension(body, space, carIdx, state->tickCount);
+    applyCarSuspension(body, space, carIdx, state->laneTick(carIdx / state->nCars));
 
     ManifoldPoint points[MAX_CAR_MANIFOLD_POINTS]{};
     const int count = buildLocalManifold(points, space, arena, carIdx, pose);

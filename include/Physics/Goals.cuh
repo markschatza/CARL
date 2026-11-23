@@ -28,5 +28,5 @@ CARL_D CARL_FI void detectGoal(
     }
 
     goal.lastScorer = scorer;
-    goal.tick = state->tickCount;
+    goal.tick = state->laneTick(simIdx);
 }

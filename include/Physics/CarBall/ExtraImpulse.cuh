@@ -65,7 +65,7 @@ CARL_D CARL_FI void applyBallCarExtraImpulse(
     const Quat& carRot,
     const Vec3& preSolveBallVel)
 {
-    const int tick = state->tickCount;
+    const int tick = state->laneTick(ballIdx);
     state->cars.ballContactTick[carIdx] = tick;
     state->lastBallTouchTicks[ballIdx] = tick;
 

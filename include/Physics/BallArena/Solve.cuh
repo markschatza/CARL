@@ -41,7 +41,7 @@ CARL_D __noinline__ Vec3 solveBallArena(
     for (int carOffset = 0; carOffset < state->nCars; carOffset++)
     {
         const int hitTick = __ldg(&state->cars.ballHitTick[carBase + carOffset]);
-        ballWasHit |= ballHitOnPreviousTick(hitTick, state->tickCount);
+        ballWasHit |= ballHitOnPreviousTick(hitTick, state->laneTick(ballIdx));
     }
 
     solveBallArenaContacts(body, contacts, count, ballWasHit);

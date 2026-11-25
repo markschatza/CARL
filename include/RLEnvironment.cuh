@@ -60,7 +60,8 @@ public:
     ArenaMesh* getDeviceArena() { return d_arena; }
     cudaStream_t getStream() const { return stream; }
 
-    bool is1v1() const { return h_state.nBlue == 1 && h_state.nOrange == 1; }
+    bool hasTeamSize(int size) const { return h_state.nBlue == size && h_state.nOrange == size; }
+    bool is1v1() const { return hasTeamSize(1); }
     int getNSim()  const { return h_state.nSim; }
     int getNCars() const { return h_state.nCars; }
 };

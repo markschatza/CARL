@@ -926,6 +926,8 @@ PYBIND11_MODULE(_carl, m)
     m.attr("REPLAY_1V1_WORDS") = replayWords<2>;
     m.attr("REPLAY_2V2_VERSION") = 1;
     m.attr("REPLAY_2V2_WORDS") = replayWords<4>;
+    m.attr("REPLAY_3V3_VERSION") = 1;
+    m.attr("REPLAY_3V3_WORDS") = replayWords<6>;
     m.attr("CAR_INTERNAL_SIZE") = static_cast<int>(CAR_INTERNAL_SIZE);
     m.attr("OBS_EGO_DODGE_TIME_INDEX") = OBS_EGO_DODGE_TIME_INDEX;
 
@@ -998,6 +1000,8 @@ PYBIND11_MODULE(_carl, m)
         .def("restore_replay_1v1", &EnvWrapper::replay<true, 2>)
         .def("capture_replay_2v2", &EnvWrapper::replay<false, 4>)
         .def("restore_replay_2v2", &EnvWrapper::replay<true, 4>)
+        .def("capture_replay_3v3", &EnvWrapper::replay<false, 6>)
+        .def("restore_replay_3v3", &EnvWrapper::replay<true, 6>)
         .def("get_obs",              &EnvWrapper::getObs)
         .def("get_transition_obs",   &EnvWrapper::getTransitionObs)
         .def("get_state",            &EnvWrapper::getState)

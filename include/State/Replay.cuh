@@ -38,6 +38,7 @@ constexpr int replayWords = sizeof(TeamReplayLane<Cars>) / sizeof(int32_t);
 constexpr int REPLAY_WORDS = replayWords<2>;
 static_assert(sizeof(TeamReplayLane<2>) % sizeof(int32_t) == 0);
 static_assert(sizeof(TeamReplayLane<4>) % sizeof(int32_t) == 0);
+static_assert(sizeof(TeamReplayLane<6>) % sizeof(int32_t) == 0);
 
 template<bool restore, class T>
 CARL_D CARL_FI void replayField(T& snapshot, T& live)

@@ -7,7 +7,7 @@ from carl.gymnasium import CARLTorchVectorEnv
 
 class ReplaySnapshotTest(unittest.TestCase):
     def test_restore_at_different_ticks_and_lanes(self):
-        for team_size in (1, 2):
+        for team_size in (1, 2, 3):
             with self.subTest(team_size=team_size):
                 self.round_trip(team_size)
 

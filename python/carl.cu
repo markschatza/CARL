@@ -667,13 +667,13 @@ public:
         }
     }
 
-    template<bool restore>
-    void replay1v1(py::object indices, py::object buffer)
+    template<bool restore, int Cars>
+    void replay(py::object indices, py::object buffer)
     {
-        if (!env.is1v1()) throw py::value_error("replay snapshots require 1v1");
+        if (!env.hasTeamSize(Cars / 2)) throw py::value_error("replay format does not match team sizes");
         int count = 0;
         auto ids = selectionData(indices, count);
-        auto rows = tensorData(buffer, "replay snapshot", {count, REPLAY_WORDS}, kDLInt, 32);
+        auto rows = tensorData(buffer, "replay snapshot", {count, replayWords<Cars>}, kDLInt, 32);
         if (!count) return;
         // Snapshot rows are opaque native state. Keep both buffers alive and
         // reject ambiguous writes when several rows target the same simulation.
@@ -687,12 +687,12 @@ public:
             || std::adjacent_find(lanes.begin(), lanes.end()) != lanes.end())
             throw py::value_error("replay lanes must be unique and in range");
         auto* bytes = static_cast<const char*>(data(rows.tensor));
-        if (reinterpret_cast<uintptr_t>(bytes) % alignof(ReplayLane))
+        if (reinterpret_cast<uintptr_t>(bytes) % alignof(TeamReplayLane<Cars>))
             throw py::value_error("unaligned replay snapshot");
         transferReplay<restore><<<(count + 31) / 32, 32, 0, env.getStream()>>>(
             env.getDeviceState(), env.getDeviceWorkspace(),
             static_cast<const int64_t*>(data(ids.tensor)),
-            reinterpret_cast<ReplayLane*>(const_cast<char*>(bytes)), count);
+            reinterpret_cast<TeamReplayLane<Cars>*>(const_cast<char*>(bytes)), count);
         CUDA_CHECK(cudaGetLastError());
         if constexpr (restore) {
             io.packObs(env.getDeviceState());
@@ -923,7 +923,9 @@ PYBIND11_MODULE(_carl, m)
     m.attr("OBS_PREVIOUS_CONTROLS") = OBS_PREVIOUS_CONTROLS;
     m.attr("OBS_CONTROLLER_VERSION") = OBS_CONTROLLER_VERSION;
     m.attr("REPLAY_1V1_VERSION") = 1;
-    m.attr("REPLAY_1V1_WORDS") = REPLAY_WORDS;
+    m.attr("REPLAY_1V1_WORDS") = replayWords<2>;
+    m.attr("REPLAY_2V2_VERSION") = 1;
+    m.attr("REPLAY_2V2_WORDS") = replayWords<4>;
     m.attr("CAR_INTERNAL_SIZE") = static_cast<int>(CAR_INTERNAL_SIZE);
     m.attr("OBS_EGO_DODGE_TIME_INDEX") = OBS_EGO_DODGE_TIME_INDEX;
 
@@ -992,8 +994,10 @@ PYBIND11_MODULE(_carl, m)
              py::arg("internal_state") = py::none(),
              py::arg("simulation_indices") = py::none())
 
-        .def("capture_replay_1v1", &EnvWrapper::replay1v1<false>)
-        .def("restore_replay_1v1", &EnvWrapper::replay1v1<true>)
+        .def("capture_replay_1v1", &EnvWrapper::replay<false, 2>)
+        .def("restore_replay_1v1", &EnvWrapper::replay<true, 2>)
+        .def("capture_replay_2v2", &EnvWrapper::replay<false, 4>)
+        .def("restore_replay_2v2", &EnvWrapper::replay<true, 4>)
         .def("get_obs",              &EnvWrapper::getObs)
         .def("get_transition_obs",   &EnvWrapper::getTransitionObs)
         .def("get_state",            &EnvWrapper::getState)

@@ -2,7 +2,7 @@
 
 #include "../Physics/CarArena/ManifoldPoint.cuh"
 
-// Decision-boundary snapshots for 1v1, in recorded world coordinates.
+// Decision-boundary snapshots for equally sized teams, in recorded world coordinates.
 // Only persistent solver state is needed: broad/narrow candidates and the
 // car/car manifold are regenerated before use each tick.
 struct ReplayWheel {
@@ -23,16 +23,21 @@ struct ReplayCar {
     int manifoldCount;
     ManifoldPoint manifold[MAX_CAR_MANIFOLD_POINTS];
 };
-struct ReplayLane {
+template<int Cars>
+struct TeamReplayLane {
     int tick, seed, sourceLane, episodeTicks, lastTouch, arenaTick;
     GoalState goal;
     Vec3 pos, vel, ang, imp, integrationPos, integrationVel, exportedPos, exportedVel;
     int integrationValid;
     float pads[NUM_BOOST_PADS];
-    ReplayCar cars[2];
+    ReplayCar cars[Cars];
 };
-constexpr int REPLAY_WORDS = sizeof(ReplayLane) / sizeof(int32_t);
-static_assert(sizeof(ReplayLane) % sizeof(int32_t) == 0);
+using ReplayLane = TeamReplayLane<2>;
+template<int Cars>
+constexpr int replayWords = sizeof(TeamReplayLane<Cars>) / sizeof(int32_t);
+constexpr int REPLAY_WORDS = replayWords<2>;
+static_assert(sizeof(TeamReplayLane<2>) % sizeof(int32_t) == 0);
+static_assert(sizeof(TeamReplayLane<4>) % sizeof(int32_t) == 0);
 
 template<bool restore, class T>
 CARL_D CARL_FI void replayField(T& snapshot, T& live)
@@ -41,14 +46,14 @@ CARL_D CARL_FI void replayField(T& snapshot, T& live)
     else snapshot = live;
 }
 
-template<bool restore>
+template<bool restore, int Cars>
 __global__ void transferReplay(GameState* s, Workspace* ws, const int64_t* indices,
-                               ReplayLane* rows, int n)
+                               TeamReplayLane<Cars>* rows, int n)
 {
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n || indices[i] < 0 || indices[i] >= s->nSim) return;
     const int lane = static_cast<int>(indices[i]);
-    ReplayLane& r = rows[i];
+    auto& r = rows[i];
     if constexpr (restore) {
         s->replayOrigin[lane] = {r.tick - s->tickCount, r.seed, r.sourceLane + 1};
     } else {
@@ -77,8 +82,8 @@ __global__ void transferReplay(GameState* s, Workspace* ws, const int64_t* indic
         replayField<restore>(r.pads[p], s->boostPadCooldowns[lane * NUM_BOOST_PADS + p]);
     auto& cars = s->cars;
     auto& susp = ws->susp;
-    for (int seat = 0; seat < 2; ++seat) {
-        const int c = lane * 2 + seat;
+    for (int seat = 0; seat < Cars; ++seat) {
+        const int c = lane * Cars + seat;
         auto& car = r.cars[seat];
         replayField<restore>(car.pos, cars.pos[c]);
         replayField<restore>(car.vel, cars.vel[c]);
@@ -91,8 +96,8 @@ __global__ void transferReplay(GameState* s, Workspace* ws, const int64_t* indic
         replayField<restore>(car.isDemoed, cars.isDemoed[c]);
         replayField<restore>(car.demoTime, cars.demoRespawnTimer[c]);
         if constexpr (restore) cars.carContactIdx[c] =
-            car.contactCar < 0 ? -1 : lane * 2 + (car.contactCar & 1);
-        else car.contactCar = cars.carContactIdx[c] < 0 ? -1 : cars.carContactIdx[c] % 2;
+            car.contactCar < 0 ? -1 : lane * Cars + (car.contactCar % Cars);
+        else car.contactCar = cars.carContactIdx[c] < 0 ? -1 : cars.carContactIdx[c] % Cars;
         replayField<restore>(car.bumpCooldown, cars.carContactCooldown[c]);
         replayField<restore>(car.hitTick, cars.ballHitTick[c]);
         replayField<restore>(car.contactTick, cars.ballContactTick[c]);
